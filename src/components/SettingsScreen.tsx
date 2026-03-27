@@ -1,20 +1,26 @@
 import { useState } from 'react';
-import { formatRupiah, CATEGORIES } from '@/lib/types';
-import { Expense } from '@/lib/types';
+import { formatRupiah, Category, Expense } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Plus, Trash2, X } from 'lucide-react';
 
 interface SettingsScreenProps {
   budget: number;
   expenses: Expense[];
+  categories: Category[];
   onSetBudget: (amount: number) => void;
+  onAddCategory: (cat: Category) => void;
+  onDeleteCategory: (key: string) => void;
 }
 
-export function SettingsScreen({ budget, expenses, onSetBudget }: SettingsScreenProps) {
+export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAddCategory, onDeleteCategory }: SettingsScreenProps) {
   const [inputVal, setInputVal] = useState(budget > 0 ? String(budget) : '');
+  const [showAddCat, setShowAddCat] = useState(false);
+  const [newCatLabel, setNewCatLabel] = useState('');
+  const [newCatIcon, setNewCatIcon] = useState('');
 
   const now = new Date();
   const monthStart = startOfMonth(now);
@@ -23,7 +29,7 @@ export function SettingsScreen({ budget, expenses, onSetBudget }: SettingsScreen
     isWithinInterval(new Date(e.date), { start: monthStart, end: monthEnd })
   );
 
-  const categoryTotals = CATEGORIES.map(cat => ({
+  const categoryTotals = categories.map(cat => ({
     ...cat,
     total: monthExpenses.filter(e => e.category === cat.key).reduce((s, e) => s + e.amount, 0),
   })).sort((a, b) => b.total - a.total);
@@ -33,6 +39,15 @@ export function SettingsScreen({ budget, expenses, onSetBudget }: SettingsScreen
   const handleSave = () => {
     const val = Number(inputVal);
     if (val >= 0) onSetBudget(val);
+  };
+
+  const handleAddCategory = () => {
+    if (!newCatLabel.trim()) return;
+    const key = newCatLabel.trim().toLowerCase().replace(/\s+/g, '-') + '-' + Date.now();
+    onAddCategory({ key, label: newCatLabel.trim(), icon: newCatIcon || '📌' });
+    setNewCatLabel('');
+    setNewCatIcon('');
+    setShowAddCat(false);
   };
 
   return (
@@ -59,26 +74,71 @@ export function SettingsScreen({ budget, expenses, onSetBudget }: SettingsScreen
       </div>
 
       <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
-        <p className="text-sm font-semibold text-foreground">Categories (This Month)</p>
-        <div className="space-y-2">
-          {categoryTotals.map(cat => (
-            <div
-              key={cat.key}
-              className={cn(
-                "flex items-center justify-between p-3 rounded-lg",
-                cat === topCategory && cat.total > 0 ? "bg-accent ring-1 ring-primary/20" : "bg-secondary"
-              )}
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="text-lg">{cat.icon}</span>
-                <span className="text-sm font-medium text-foreground">{cat.label}</span>
-                {cat === topCategory && cat.total > 0 && (
-                  <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded font-semibold">TOP</span>
-                )}
-              </div>
-              <span className="text-sm font-bold text-foreground">{formatRupiah(cat.total)}</span>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-foreground">Categories</p>
+          <button
+            onClick={() => setShowAddCat(!showAddCat)}
+            className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center"
+          >
+            {showAddCat ? <X size={16} /> : <Plus size={16} />}
+          </button>
+        </div>
+
+        {showAddCat && (
+          <div className="bg-secondary rounded-xl p-3 space-y-2">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Icon (emoji)"
+                value={newCatIcon}
+                onChange={e => setNewCatIcon(e.target.value)}
+                className="h-10 w-16 text-center text-lg"
+                maxLength={2}
+              />
+              <Input
+                placeholder="Category name"
+                value={newCatLabel}
+                onChange={e => setNewCatLabel(e.target.value)}
+                className="h-10 flex-1"
+              />
             </div>
-          ))}
+            <Button onClick={handleAddCategory} size="sm" className="w-full h-10 font-semibold">
+              Add Category
+            </Button>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {categoryTotals.map(cat => {
+            const hasExpenses = monthExpenses.some(e => e.category === cat.key);
+            return (
+              <div
+                key={cat.key}
+                className={cn(
+                  "flex items-center justify-between p-3 rounded-lg",
+                  cat === topCategory && cat.total > 0 ? "bg-accent ring-1 ring-primary/20" : "bg-secondary"
+                )}
+              >
+                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                  <span className="text-lg">{cat.icon}</span>
+                  <span className="text-sm font-medium text-foreground truncate">{cat.label}</span>
+                  {cat === topCategory && cat.total > 0 && (
+                    <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded font-semibold shrink-0">TOP</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-sm font-bold text-foreground">{formatRupiah(cat.total)}</span>
+                  {!hasExpenses && (
+                    <button
+                      onClick={() => onDeleteCategory(cat.key)}
+                      className="w-7 h-7 rounded-md bg-destructive/10 flex items-center justify-center text-destructive"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

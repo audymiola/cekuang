@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Expense, CATEGORIES, formatRupiah, getCategoryByKey } from '@/lib/types';
+import { Expense, Category, formatRupiah } from '@/lib/types';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, format, eachDayOfInterval } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -7,9 +7,10 @@ const CHART_COLORS = ['#2a9d8f', '#e9c46a', '#f4a261', '#e76f51', '#264653', '#a
 
 interface ChartsScreenProps {
   expenses: Expense[];
+  categories: Category[];
 }
 
-export function ChartsScreen({ expenses }: ChartsScreenProps) {
+export function ChartsScreen({ expenses, categories }: ChartsScreenProps) {
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
@@ -33,10 +34,10 @@ export function ChartsScreen({ expenses }: ChartsScreenProps) {
     );
     const map = new Map<string, number>();
     monthExpenses.forEach(e => map.set(e.category, (map.get(e.category) || 0) + e.amount));
-    return CATEGORIES
+    return categories
       .filter(c => map.has(c.key))
       .map(c => ({ name: c.icon + ' ' + c.label, value: map.get(c.key) || 0 }));
-  }, [expenses]);
+  }, [expenses, categories]);
 
   const weekTotal = useMemo(() =>
     expenses.filter(e => isWithinInterval(new Date(e.date), { start: weekStart, end: weekEnd }))

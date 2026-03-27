@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Expense, CategoryKey, CATEGORIES } from '@/lib/types';
+import { Expense, Category } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,14 +9,15 @@ import { cn } from '@/lib/utils';
 
 interface ExpenseFormProps {
   expense?: Expense | null;
+  categories: Category[];
   onSave: (data: Omit<Expense, 'id'>) => void;
   onCancel?: () => void;
 }
 
-export function ExpenseForm({ expense, onSave, onCancel }: ExpenseFormProps) {
+export function ExpenseForm({ expense, categories, onSave, onCancel }: ExpenseFormProps) {
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<CategoryKey>('food');
+  const [category, setCategory] = useState(categories[0]?.key || '');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
 
@@ -41,7 +42,7 @@ export function ExpenseForm({ expense, onSave, onCancel }: ExpenseFormProps) {
       notes: notes.trim() || undefined,
     });
     if (!expense) {
-      setTitle(''); setAmount(''); setCategory('food');
+      setTitle(''); setAmount(''); setCategory(categories[0]?.key || '');
       setDate(format(new Date(), 'yyyy-MM-dd')); setNotes('');
     }
   };
@@ -61,7 +62,7 @@ export function ExpenseForm({ expense, onSave, onCancel }: ExpenseFormProps) {
       <div className="space-y-1.5">
         <Label>Category</Label>
         <div className="grid grid-cols-4 gap-2">
-          {CATEGORIES.map(c => (
+          {categories.map(c => (
             <button
               key={c.key}
               type="button"

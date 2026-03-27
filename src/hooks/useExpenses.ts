@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Expense } from '@/lib/types';
+import { Expense, Category, DEFAULT_CATEGORIES } from '@/lib/types';
 
 const STORAGE_KEY = 'expense-tracker-data';
 const BUDGET_KEY = 'expense-tracker-budget';
+const CATEGORIES_KEY = 'expense-tracker-categories';
 
 const loadExpenses = (): Expense[] => {
   try {
@@ -11,8 +12,11 @@ const loadExpenses = (): Expense[] => {
   } catch { return []; }
 };
 
-const saveExpenses = (expenses: Expense[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+const loadCategories = (): Category[] => {
+  try {
+    const data = localStorage.getItem(CATEGORIES_KEY);
+    return data ? JSON.parse(data) : DEFAULT_CATEGORIES;
+  } catch { return DEFAULT_CATEGORIES; }
 };
 
 export function useExpenses() {
@@ -21,9 +25,11 @@ export function useExpenses() {
     const b = localStorage.getItem(BUDGET_KEY);
     return b ? Number(b) : 0;
   });
+  const [categories, setCategories] = useState<Category[]>(loadCategories);
 
-  useEffect(() => { saveExpenses(expenses); }, [expenses]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses)); }, [expenses]);
   useEffect(() => { localStorage.setItem(BUDGET_KEY, String(budget)); }, [budget]);
+  useEffect(() => { localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories)); }, [categories]);
 
   const addExpense = useCallback((expense: Omit<Expense, 'id'>) => {
     setExpenses(prev => [...prev, { ...expense, id: crypto.randomUUID() }]);
@@ -41,5 +47,13 @@ export function useExpenses() {
     setBudgetState(amount);
   }, []);
 
-  return { expenses, budget, addExpense, updateExpense, deleteExpense, setBudget };
+  const addCategory = useCallback((cat: Category) => {
+    setCategories(prev => [...prev, cat]);
+  }, []);
+
+  const deleteCategory = useCallback((key: string) => {
+    setCategories(prev => prev.filter(c => c.key !== key));
+  }, []);
+
+  return { expenses, budget, categories, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory };
 }

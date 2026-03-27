@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Expense, CategoryKey, CATEGORIES, formatRupiah } from '@/lib/types';
+import { Expense, Category, formatRupiah } from '@/lib/types';
 import { ExpenseCard } from './ExpenseCard';
 import { BudgetBar } from './BudgetBar';
 import { AnimatePresence } from 'framer-motion';
@@ -12,15 +12,16 @@ type TimeFilter = 'all' | 'week' | 'month';
 
 interface HomeScreenProps {
   expenses: Expense[];
+  categories: Category[];
   budget: number;
   onEdit: (expense: Expense) => void;
   onDelete: (id: string) => void;
 }
 
-export function HomeScreen({ expenses, budget, onEdit, onDelete }: HomeScreenProps) {
+export function HomeScreen({ expenses, categories, budget, onEdit, onDelete }: HomeScreenProps) {
   const [sortBy, setSortBy] = useState<SortBy>('date');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
-  const [catFilter, setCatFilter] = useState<CategoryKey | 'all'>('all');
+  const [catFilter, setCatFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
 
   const now = new Date();
@@ -107,7 +108,7 @@ export function HomeScreen({ expenses, budget, onEdit, onDelete }: HomeScreenPro
                 catFilter === 'all' ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
               )}
             >All</button>
-            {CATEGORIES.map(c => (
+            {categories.map(c => (
               <button key={c.key} onClick={() => setCatFilter(c.key)}
                 className={cn("px-3 py-1.5 rounded-lg text-xs font-medium",
                   catFilter === c.key ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
@@ -123,12 +124,12 @@ export function HomeScreen({ expenses, budget, onEdit, onDelete }: HomeScreenPro
       <div className="space-y-2">
         <AnimatePresence>
           {filtered.map(expense => (
-            <ExpenseCard key={expense.id} expense={expense} onEdit={onEdit} onDelete={onDelete} />
+            <ExpenseCard key={expense.id} expense={expense} categories={categories} onEdit={onEdit} onDelete={onDelete} />
           ))}
         </AnimatePresence>
         {filtered.length === 0 && (
           <div className="text-center py-12 text-muted-foreground text-sm">
-            No expenses yet. Tap "Add" to get started!
+            No expenses yet. Tap "+" to get started!
           </div>
         )}
       </div>

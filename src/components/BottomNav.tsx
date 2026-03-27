@@ -1,4 +1,4 @@
-import { Home, PlusCircle, BarChart3, Settings } from 'lucide-react';
+import { Home, BarChart3, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type TabKey = 'home' | 'add' | 'charts' | 'settings';
@@ -10,7 +10,6 @@ interface BottomNavProps {
 
 const tabs: { key: TabKey; label: string; icon: typeof Home }[] = [
   { key: 'home', label: 'Home', icon: Home },
-  { key: 'add', label: 'Add', icon: PlusCircle },
   { key: 'charts', label: 'Charts', icon: BarChart3 },
   { key: 'settings', label: 'Settings', icon: Settings },
 ];
