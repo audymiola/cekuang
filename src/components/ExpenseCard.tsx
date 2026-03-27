@@ -1,4 +1,4 @@
-import { Expense, getCategoryByKey, formatRupiah } from '@/lib/types';
+import { Expense, Category, formatRupiah } from '@/lib/types';
 import { format } from 'date-fns';
 import { Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -6,13 +6,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface ExpenseCardProps {
   expense: Expense;
+  categories: Category[];
   onEdit: (expense: Expense) => void;
   onDelete: (id: string) => void;
 }
 
-export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
+export function ExpenseCard({ expense, categories, onEdit, onDelete }: ExpenseCardProps) {
   const [showActions, setShowActions] = useState(false);
-  const cat = getCategoryByKey(expense.category);
+  const cat = categories.find(c => c.key === expense.category);
 
   return (
     <motion.div
@@ -24,7 +25,7 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
       onClick={() => setShowActions(!showActions)}
     >
       <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center text-lg shrink-0">
-        {cat.icon}
+        {cat?.icon || '📦'}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-foreground truncate">{expense.title}</p>
