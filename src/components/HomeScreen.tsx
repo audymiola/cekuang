@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Expense, Category, formatRupiah } from '@/lib/types';
 import { ExpenseCard } from './ExpenseCard';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, format } from 'date-fns';
 import { ArrowUpDown, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -35,7 +35,6 @@ export function HomeScreen({ expenses, categories, budget, onEdit, onDelete }: H
 
   const filtered = useMemo(() => {
     let list = [...expenses];
-
     if (timeFilter === 'week') {
       const start = startOfWeek(now, { weekStartsOn: 1 });
       const end = endOfWeek(now, { weekStartsOn: 1 });
@@ -45,11 +44,9 @@ export function HomeScreen({ expenses, categories, budget, onEdit, onDelete }: H
       const end = endOfMonth(now);
       list = list.filter(e => isWithinInterval(new Date(e.date), { start, end }));
     }
-
     if (catFilter !== 'all') {
       list = list.filter(e => e.category === catFilter);
     }
-
     switch (sortBy) {
       case 'date': list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); break;
       case 'amount-high': list.sort((a, b) => b.amount - a.amount); break;
@@ -59,9 +56,8 @@ export function HomeScreen({ expenses, categories, budget, onEdit, onDelete }: H
     return list;
   }, [expenses, sortBy, timeFilter, catFilter]);
 
-  // Group expenses by month
   const grouped = useMemo(() => {
-    if (sortBy !== 'date') return null; // Only group when sorting by date
+    if (sortBy !== 'date') return null;
     const groups: { label: string; items: Expense[] }[] = [];
     filtered.forEach(expense => {
       const label = format(new Date(expense.date), 'MMMM yyyy');
@@ -82,7 +78,8 @@ export function HomeScreen({ expenses, categories, budget, onEdit, onDelete }: H
       <div className="flex gap-2">
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={cn("flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium transition-colors",
+          className={cn(
+            "flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium transition-colors",
             showFilters ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
           )}
         >
@@ -95,7 +92,8 @@ export function HomeScreen({ expenses, categories, budget, onEdit, onDelete }: H
           }}
           className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-secondary text-xs font-medium text-muted-foreground"
         >
-          <ArrowUpDown size={14} /> {sortBy === 'date' ? 'Date' : sortBy === 'amount-high' ? 'High→Low' : sortBy === 'amount-low' ? 'Low→High' : 'Category'}
+          <ArrowUpDown size={14} />
+          {sortBy === 'date' ? 'Date' : sortBy === 'amount-high' ? 'High→Low' : sortBy === 'amount-low' ? 'Low→High' : 'Category'}
         </button>
       </div>
 
@@ -133,7 +131,6 @@ export function HomeScreen({ expenses, categories, budget, onEdit, onDelete }: H
 
       <div className="space-y-2">
         {grouped ? (
-          // Grouped by month view
           grouped.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground text-sm">
               No expenses yet. Tap "+" to get started!
@@ -146,6 +143,35 @@ export function HomeScreen({ expenses, categories, budget, onEdit, onDelete }: H
                     {group.label}
                   </span>
                   <div className="flex-1 h-px bg-border" />
-                 <span className="text-xs text-muted-foreground">
-  {formatRupiah(group.items.reduce((sum, e) => sum + e.amount, 0))}
-</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatRupiah(group.items.reduce((sum, e) => sum + e.amount, 0))}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <AnimatePresence>
+                    {group.items.map(expense => (
+                      <ExpenseCard key={expense.id} expense={expense} categories={categories} onEdit={onEdit} onDelete={onDelete} />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+            ))
+          )
+        ) : (
+          <>
+            <AnimatePresence>
+              {filtered.map(expense => (
+                <ExpenseCard key={expense.id} expense={expense} categories={categories} onEdit={onEdit} onDelete={onDelete} />
+              ))}
+            </AnimatePresence>
+            {filtered.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground text-sm">
+                No expenses yet. Tap "+" to get started!
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
