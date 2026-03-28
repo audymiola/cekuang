@@ -2,30 +2,55 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Wallet } from 'lucide-react';
 
+type Screen = 'login' | 'signup' | 'forgot';
+
 export function AuthScreen() {
-  const { signIn, signUp } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+  const { signIn, signUp, resetPassword } = useAuth();
+  const [screen, setScreen] = useState<Screen>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const reset = () => { setError(''); setMessage(''); setEmail(''); setPassword(''); };
+
   const handleSubmit = async () => {
     setError('');
     setMessage('');
-    if (!email || !password) { setError('Please fill in all fields.'); return; }
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (!email) { setError('Please enter your email.'); return; }
+    if (screen !== 'forgot' && !password) { setError('Please enter your password.'); return; }
+    if (screen !== 'forgot' && password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+
     setLoading(true);
-    if (isLogin) {
+
+    if (screen === 'login') {
       const { error } = await signIn(email, password);
       if (error) setError(error.message);
-    } else {
+    } else if (screen === 'signup') {
       const { error } = await signUp(email, password);
       if (error) setError(error.message);
       else setMessage('Account created! Please check your email to confirm, then log in.');
+    } else if (screen === 'forgot') {
+      const { error } = await resetPassword(email);
+      if (error) setError(error.message);
+      else setMessage('Password reset email sent! Check your inbox.');
     }
+
     setLoading(false);
+  };
+
+  const getTitle = () => {
+    if (screen === 'login') return 'Welcome back';
+    if (screen === 'signup') return 'Create account';
+    return 'Reset password';
+  };
+
+  const getButtonLabel = () => {
+    if (loading) return 'Please wait...';
+    if (screen === 'login') return 'Log In';
+    if (screen === 'signup') return 'Sign Up';
+    return 'Send Reset Email';
   };
 
   return (
@@ -42,9 +67,7 @@ export function AuthScreen() {
 
         {/* Card */}
         <div className="bg-card rounded-2xl shadow-card p-6">
-          <h2 className="text-lg font-bold text-foreground mb-5">
-            {isLogin ? 'Welcome back' : 'Create account'}
-          </h2>
+          <h2 className="text-lg font-bold text-foreground mb-5">{getTitle()}</h2>
 
           <div className="space-y-3">
             <div>
@@ -57,17 +80,31 @@ export function AuthScreen() {
                 className="w-full h-11 px-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium text-foreground mb-1 block">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Min. 6 characters"
-                className="w-full h-11 px-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-              />
-            </div>
+
+            {screen !== 'forgot' && (
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1 block">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Min. 6 characters"
+                  className="w-full h-11 px-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                />
+              </div>
+            )}
+
+            {screen === 'login' && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() => { reset(); setScreen('forgot'); }}
+                  className="text-xs text-primary font-medium"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
           </div>
 
           {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
@@ -78,18 +115,26 @@ export function AuthScreen() {
             disabled={loading}
             className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm mt-5 active:scale-95 transition-transform disabled:opacity-60"
           >
-            {loading ? 'Please wait...' : isLogin ? 'Log In' : 'Sign Up'}
+            {getButtonLabel()}
           </button>
 
-          <p className="text-center text-sm text-muted-foreground mt-4">
-            {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
-            <button
-              onClick={() => { setIsLogin(!isLogin); setError(''); setMessage(''); }}
-              className="text-primary font-semibold"
-            >
-              {isLogin ? 'Sign Up' : 'Log In'}
-            </button>
-          </p>
+          <div className="text-center text-sm text-muted-foreground mt-4 space-y-1">
+            {screen === 'login' && (
+              <p>Don't have an account?{' '}
+                <button onClick={() => { reset(); setScreen('signup'); }} className="text-primary font-semibold">Sign Up</button>
+              </p>
+            )}
+            {screen === 'signup' && (
+              <p>Already have an account?{' '}
+                <button onClick={() => { reset(); setScreen('login'); }} className="text-primary font-semibold">Log In</button>
+              </p>
+            )}
+            {screen === 'forgot' && (
+              <p>Remember your password?{' '}
+                <button onClick={() => { reset(); setScreen('login'); }} className="text-primary font-semibold">Log In</button>
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
