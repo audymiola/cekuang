@@ -16,13 +16,21 @@ export function AuthScreen() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Detect reset token in URL
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes('access_token') && hash.includes('type=recovery')) {
-      setScreen('reset');
-    }
-  }, []);
+// Detect reset token via Supabase auth event
+useEffect(() => {
+  const hash = window.location.hash;
+  if (hash.includes('access_token')) {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setScreen('reset');
+    });
+  }
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') setScreen('reset');
+  });
+
+  return () => subscription.unsubscribe();
+}, []);
 
   const reset = () => { setError(''); setMessage(''); setEmail(''); setPassword(''); };
 
