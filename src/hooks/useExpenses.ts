@@ -1,59 +1,71 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Expense, Category, DEFAULT_CATEGORIES } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import { User } from '@supabase/supabase-js';
 
-const STORAGE_KEY = 'expense-tracker-data';
-const BUDGET_KEY = 'expense-tracker-budget';
-const CATEGORIES_KEY = 'expense-tracker-categories';
+export function useExpenses(user: User) {
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [budget, setBudgetState] = useState<number>(0);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [loaded, setLoaded] = useState(false);
 
-const loadExpenses = (): Expense[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch { return []; }
-};
+  // Load all data on mount
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const [{ data: exp }, { data: cats }, { data: bud }] = await Promise.all([
+        supabase.from('expenses').select('*').eq('user_id', user.id).order('date', { ascending: false }),
+        supabase.from('categories').select('*').eq('user_id', user.id),
+        supabase.from('budgets').select('*').eq('user_id', user.id).single(),
+      ]);
+      if (exp) setExpenses(exp);
+      if (cats && cats.length > 0) setCategories(cats);
+      else {
+        // Seed default categories for new user
+        const toInsert = DEFAULT_CATEGORIES.map(c => ({ ...c, user_id: user.id }));
+        const { data: inserted } = await supabase.from('categories').insert(toInsert).select();
+        if (inserted) setCategories(inserted);
+      }
+      if (bud) setBudgetState(bud.amount);
+      setLoaded(true);
+    };
+    load();
+  }, [user]);
 
-const loadCategories = (): Category[] => {
-  try {
-    const data = localStorage.getItem(CATEGORIES_KEY);
-    return data ? JSON.parse(data) : DEFAULT_CATEGORIES;
-  } catch { return DEFAULT_CATEGORIES; }
-};
+  const addExpense = useCallback(async (expense: Omit<Expense, 'id'>) => {
+    const { data } = await supabase.from('expenses').insert({ ...expense, user_id: user.id }).select().single();
+    if (data) setExpenses(prev => [data, ...prev]);
+  }, [user]);
 
-export function useExpenses() {
-  const [expenses, setExpenses] = useState<Expense[]>(loadExpenses);
-  const [budget, setBudgetState] = useState<number>(() => {
-    const b = localStorage.getItem(BUDGET_KEY);
-    return b ? Number(b) : 0;
-  });
-  const [categories, setCategories] = useState<Category[]>(loadCategories);
-
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses)); }, [expenses]);
-  useEffect(() => { localStorage.setItem(BUDGET_KEY, String(budget)); }, [budget]);
-  useEffect(() => { localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories)); }, [categories]);
-
-  const addExpense = useCallback((expense: Omit<Expense, 'id'>) => {
-    setExpenses(prev => [...prev, { ...expense, id: crypto.randomUUID() }]);
-  }, []);
-
-  const updateExpense = useCallback((id: string, data: Omit<Expense, 'id'>) => {
+  const updateExpense = useCallback(async (id: string, data: Omit<Expense, 'id'>) => {
+    await supabase.from('expenses').update(data).eq('id', id);
     setExpenses(prev => prev.map(e => e.id === id ? { ...data, id } : e));
   }, []);
 
-  const deleteExpense = useCallback((id: string) => {
+  const deleteExpense = useCallback(async (id: string) => {
+    await supabase.from('expenses').delete().eq('id', id);
     setExpenses(prev => prev.filter(e => e.id !== id));
   }, []);
 
-  const setBudget = useCallback((amount: number) => {
+  const setBudget = useCallback(async (amount: number) => {
+    const { data: existing } = await supabase.from('budgets').select('id').eq('user_id', user.id).single();
+    if (existing) {
+      await supabase.from('budgets').update({ amount, updated_at: new Date().toISOString() }).eq('user_id', user.id);
+    } else {
+      await supabase.from('budgets').insert({ user_id: user.id, amount });
+    }
     setBudgetState(amount);
-  }, []);
+  }, [user]);
 
-  const addCategory = useCallback((cat: Category) => {
-    setCategories(prev => [...prev, cat]);
-  }, []);
+  const addCategory = useCallback(async (cat: Category) => {
+    const { data } = await supabase.from('categories').insert({ ...cat, user_id: user.id }).select().single();
+    if (data) setCategories(prev => [...prev, data]);
+  }, [user]);
 
-  const deleteCategory = useCallback((key: string) => {
+  const deleteCategory = useCallback(async (key: string) => {
+    await supabase.from('categories').delete().eq('key', key).eq('user_id', user.id);
     setCategories(prev => prev.filter(c => c.key !== key));
-  }, []);
+  }, [user]);
 
-  return { expenses, budget, categories, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory };
+  return { expenses, budget, categories, loaded, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory };
 }

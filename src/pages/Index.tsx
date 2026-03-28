@@ -8,9 +8,12 @@ import { useExpenses } from '@/hooks/useExpenses';
 import { Expense } from '@/lib/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
+import { User } from '@supabase/supabase-js';
+import { useAuth } from '@/hooks/useAuth';
 
-const Index = () => {
-  const { expenses, budget, categories, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory } = useExpenses();
+const Index = ({ user }: { user: User }) => {
+  const { expenses, budget, categories, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory } = useExpenses(user);
+  const { signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -51,13 +54,12 @@ const Index = () => {
           )}
           {activeTab === 'settings' && (
             <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-              <SettingsScreen budget={budget} expenses={expenses} categories={categories} onSetBudget={setBudget} onAddCategory={addCategory} onDeleteCategory={deleteCategory} />
+              <SettingsScreen budget={budget} expenses={expenses} categories={categories} onSetBudget={setBudget} onAddCategory={addCategory} onDeleteCategory={deleteCategory} onSignOut={signOut} />
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* FAB */}
       {!showAddForm && (
         <button
           onClick={() => setShowAddForm(true)}
@@ -68,20 +70,15 @@ const Index = () => {
         </button>
       )}
 
-      {/* Add/Edit overlay */}
       <AnimatePresence>
         {showAddForm && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[60] bg-foreground/30 flex items-end justify-center"
             onClick={handleCloseForm}
           >
             <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
               className="w-full max-w-[430px] bg-card rounded-t-2xl shadow-modal max-h-[90vh] overflow-y-auto"
               onClick={e => e.stopPropagation()}
@@ -90,18 +87,12 @@ const Index = () => {
                 <h2 className="text-lg font-bold text-foreground">
                   {editingExpense ? 'Edit Expense' : 'Add Expense'}
                 </h2>
-                <button onClick={handleCloseForm}
-                  className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground">
+                <button onClick={handleCloseForm} className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground">
                   <X size={18} />
                 </button>
               </div>
               <div className="p-4">
-                <ExpenseForm
-                  expense={editingExpense}
-                  categories={categories}
-                  onSave={handleSave}
-                  onCancel={handleCloseForm}
-                />
+                <ExpenseForm expense={editingExpense} categories={categories} onSave={handleSave} onCancel={handleCloseForm} />
               </div>
             </motion.div>
           </motion.div>
