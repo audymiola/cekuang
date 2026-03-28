@@ -1,9 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Expense, Category, formatRupiah } from '@/lib/types';
 import { ExpenseCard } from './ExpenseCard';
-import { BudgetBar } from './BudgetBar';
-import { AnimatePresence } from 'framer-motion';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { AnimatePresence, motion } from 'framer-motion';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, format } from 'date-fns';
 import { ArrowUpDown, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -60,14 +59,25 @@ export function HomeScreen({ expenses, categories, budget, onEdit, onDelete }: H
     return list;
   }, [expenses, sortBy, timeFilter, catFilter]);
 
+  // Group expenses by month
+  const grouped = useMemo(() => {
+    if (sortBy !== 'date') return null; // Only group when sorting by date
+    const groups: { label: string; items: Expense[] }[] = [];
+    filtered.forEach(expense => {
+      const label = format(new Date(expense.date), 'MMMM yyyy');
+      const existing = groups.find(g => g.label === label);
+      if (existing) existing.items.push(expense);
+      else groups.push({ label, items: [expense] });
+    });
+    return groups;
+  }, [filtered, sortBy]);
+
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold text-foreground">Expenses</h1>
         <p className="text-sm text-muted-foreground">This month: {formatRupiah(monthlySpent)}</p>
       </div>
-
-      <BudgetBar budget={budget} spent={monthlySpent} />
 
       <div className="flex gap-2">
         <button
@@ -122,17 +132,19 @@ export function HomeScreen({ expenses, categories, budget, onEdit, onDelete }: H
       )}
 
       <div className="space-y-2">
-        <AnimatePresence>
-          {filtered.map(expense => (
-            <ExpenseCard key={expense.id} expense={expense} categories={categories} onEdit={onEdit} onDelete={onDelete} />
-          ))}
-        </AnimatePresence>
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground text-sm">
-            No expenses yet. Tap "+" to get started!
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+        {grouped ? (
+          // Grouped by month view
+          grouped.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              No expenses yet. Tap "+" to get started!
+            </div>
+          ) : (
+            grouped.map(group => (
+              <div key={group.label}>
+                <div className="flex items-center gap-2 mb-2 mt-3 first:mt-0">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {group.label}
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-muted-foreground">
+                    {formatRupiah(group.items.reduce((s, e) => s

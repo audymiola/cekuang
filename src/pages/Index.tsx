@@ -10,6 +10,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = ({ user }: { user: User }) => {
   const { expenses, budget, categories, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory } = useExpenses(user);
@@ -17,18 +18,21 @@ const Index = ({ user }: { user: User }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+const { toast } = useToast();
 
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
     setShowAddForm(true);
   };
 
-  const handleSave = (data: Omit<Expense, 'id'>) => {
+ const handleSave = (data: Omit<Expense, 'id'>) => {
     if (editingExpense) {
       updateExpense(editingExpense.id, data);
       setEditingExpense(null);
+      toast({ description: "Expense updated successfully!" });
     } else {
       addExpense(data);
+      toast({ description: "✓ Expense added!" });
     }
     setShowAddForm(false);
   };

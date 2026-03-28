@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { formatRupiah, Category, Expense } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Plus, Trash2, X, LogOut } from 'lucide-react';
+import { Plus, Trash2, X, LogOut, AlertTriangle } from 'lucide-react';
 
 interface SettingsScreenProps {
   budget: number;
@@ -17,11 +16,20 @@ interface SettingsScreenProps {
   onSignOut: () => void;
 }
 
+const formatInput = (val: string): string => {
+  const digits = val.replace(/\D/g, '');
+  if (!digits) return '';
+  return Number(digits).toLocaleString('id-ID');
+};
+
+const parseInput = (val: string): number => Number(val.replace(/\./g, ''));
+
 export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAddCategory, onDeleteCategory, onSignOut }: SettingsScreenProps) {
-  const [inputVal, setInputVal] = useState(budget > 0 ? String(budget) : '');
   const [showAddCat, setShowAddCat] = useState(false);
   const [newCatLabel, setNewCatLabel] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('');
+  const [catBudgets, setCatBudgets] = useState<Record<string, string>>({});
+  const [editingBudget, setEditingBudget] = useState<string | null>(null);
 
   const now = new Date();
   const monthStart = startOfMonth(now);
@@ -37,11 +45,6 @@ export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAd
 
   const topCategory = categoryTotals[0];
 
-  const handleSave = () => {
-    const val = Number(inputVal);
-    if (val >= 0) onSetBudget(val);
-  };
-
   const handleAddCategory = () => {
     if (!newCatLabel.trim()) return;
     const key = newCatLabel.trim().toLowerCase().replace(/\s+/g, '-') + '-' + Date.now();
@@ -51,32 +54,23 @@ export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAd
     setShowAddCat(false);
   };
 
+  const getBudgetWarning = (total: number, budgetStr: string) => {
+    const budget = parseInput(budgetStr);
+    if (!budget) return null;
+    const pct = total / budget;
+    if (pct >= 1) return 'exceeded';
+    if (pct >= 0.8) return 'warning';
+    return null;
+  };
+
   return (
     <div className="space-y-5">
       <h1 className="text-xl font-bold text-foreground">Settings</h1>
 
-      <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
-        <Label htmlFor="budget" className="text-sm font-semibold">Monthly Budget (Rp)</Label>
-        <div className="flex gap-2">
-          <Input
-            id="budget"
-            type="number"
-            placeholder="e.g. 3000000"
-            min="0"
-            value={inputVal}
-            onChange={e => setInputVal(e.target.value)}
-            className="h-12 flex-1"
-          />
-          <Button onClick={handleSave} className="h-12 px-6 font-semibold">Save</Button>
-        </div>
-        {budget > 0 && (
-          <p className="text-xs text-muted-foreground">Current budget: {formatRupiah(budget)}</p>
-        )}
-      </div>
-
+      {/* Categories */}
       <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-foreground">Categories</p>
+          <p className="text-sm font-semibold text-foreground">Categories & Budget</p>
           <button
             onClick={() => setShowAddCat(!showAddCat)}
             className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center"
@@ -89,7 +83,7 @@ export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAd
           <div className="bg-secondary rounded-xl p-3 space-y-2">
             <div className="flex gap-2">
               <Input
-                placeholder="Icon (emoji)"
+                placeholder="Icon"
                 value={newCatIcon}
                 onChange={e => setNewCatIcon(e.target.value)}
                 className="h-10 w-16 text-center text-lg"
@@ -111,50 +105,14 @@ export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAd
         <div className="space-y-2">
           {categoryTotals.map(cat => {
             const hasExpenses = monthExpenses.some(e => e.category === cat.key);
+            const budgetStr = catBudgets[cat.key] || '';
+            const warning = getBudgetWarning(cat.total, budgetStr);
+            const budgetNum = parseInput(budgetStr);
+            const isEditing = editingBudget === cat.key;
+
             return (
               <div
                 key={cat.key}
                 className={cn(
-                  "flex items-center justify-between p-3 rounded-lg",
-                  cat === topCategory && cat.total > 0 ? "bg-accent ring-1 ring-primary/20" : "bg-secondary"
-                )}
-              >
-                <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                  <span className="text-lg">{cat.icon}</span>
-                  <span className="text-sm font-medium text-foreground truncate">{cat.label}</span>
-                  {cat === topCategory && cat.total > 0 && (
-                    <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded font-semibold shrink-0">TOP</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm font-bold text-foreground">{formatRupiah(cat.total)}</span>
-                  {!hasExpenses && (
-                    <button
-                      onClick={() => onDeleteCategory(cat.key)}
-                      className="w-7 h-7 rounded-md bg-destructive/10 flex items-center justify-center text-destructive"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Sign Out */}
-      <div className="bg-card rounded-xl p-4 shadow-card">
-        <p className="text-sm font-semibold text-foreground mb-3">Account</p>
-        <button
-          onClick={onSignOut}
-          className="w-full h-11 rounded-xl border border-destructive/40 text-destructive font-semibold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform"
-        >
-          <LogOut size={16} />
-          Sign Out
-        </button>
-      </div>
-
-    </div>
-  );
-}
+                  "rounded-lg p-3 space-y-2",
+                  warning === 'exceeded' ? "bg-destructive/10 ring-1 ring-destructive/30" :
