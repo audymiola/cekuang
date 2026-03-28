@@ -116,3 +116,105 @@ export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAd
                 className={cn(
                   "rounded-lg p-3 space-y-2",
                   warning === 'exceeded' ? "bg-destructive/10 ring-1 ring-destructive/30" :
+                  warning === 'warning' ? "bg-amber-50 ring-1 ring-amber-200" :
+                  cat === topCategory && cat.total > 0 ? "bg-accent ring-1 ring-primary/20" : "bg-secondary"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <span className="text-lg">{cat.icon}</span>
+                    <span className="text-sm font-medium text-foreground truncate">{cat.label}</span>
+                    {cat === topCategory && cat.total > 0 && (
+                      <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded font-semibold shrink-0">TOP</span>
+                    )}
+                    {warning === 'exceeded' && (
+                      <AlertTriangle size={13} className="text-destructive shrink-0" />
+                    )}
+                    {warning === 'warning' && (
+                      <AlertTriangle size={13} className="text-amber-500 shrink-0" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-bold text-foreground">{formatRupiah(cat.total)}</span>
+                    {!hasExpenses && (
+                      <button
+                        onClick={() => onDeleteCategory(cat.key)}
+                        className="w-7 h-7 rounded-md bg-destructive/10 flex items-center justify-center text-destructive"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Budget per category */}
+                {isEditing ? (
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Set budget (Rp)"
+                      value={budgetStr}
+                      onChange={e => setCatBudgets(prev => ({ ...prev, [cat.key]: formatInput(e.target.value) }))}
+                      className="h-9 text-sm flex-1"
+                      autoFocus
+                    />
+                    <Button
+                      size="sm"
+                      className="h-9 px-3 text-xs"
+                      onClick={() => setEditingBudget(null)}
+                    >
+                      Done
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setEditingBudget(cat.key)}
+                    className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                  >
+                    {budgetNum > 0 ? (
+                      <span className={cn(
+                        warning === 'exceeded' ? "text-destructive font-medium" :
+                        warning === 'warning' ? "text-amber-600 font-medium" : ""
+                      )}>
+                        Budget: {formatRupiah(budgetNum)}
+                        {warning === 'exceeded' && ' — Exceeded!'}
+                        {warning === 'warning' && ' — Almost reached!'}
+                      </span>
+                    ) : '+ Set budget'}
+                  </button>
+                )}
+
+                {/* Budget progress bar */}
+                {budgetNum > 0 && (
+                  <div className="w-full h-1.5 bg-black/10 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        warning === 'exceeded' ? "bg-destructive" :
+                        warning === 'warning' ? "bg-amber-400" : "bg-primary"
+                      )}
+                      style={{ width: `${Math.min((cat.total / budgetNum) * 100, 100)}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Sign Out */}
+      <div className="bg-card rounded-xl p-4 shadow-card">
+        <p className="text-sm font-semibold text-foreground mb-3">Account</p>
+        <button
+          onClick={onSignOut}
+          className="w-full h-11 rounded-xl border border-destructive/40 text-destructive font-semibold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform"
+        >
+          <LogOut size={16} />
+          Sign Out
+        </button>
+      </div>
+    </div>
+  );
+}
