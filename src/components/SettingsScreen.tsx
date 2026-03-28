@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2, X, LogOut } from 'lucide-react';
 
 interface SettingsScreenProps {
   budget: number;
@@ -14,9 +14,10 @@ interface SettingsScreenProps {
   onSetBudget: (amount: number) => void;
   onAddCategory: (cat: Category) => void;
   onDeleteCategory: (key: string) => void;
+  onSignOut: () => void;
 }
 
-export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAddCategory, onDeleteCategory }: SettingsScreenProps) {
+export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAddCategory, onDeleteCategory, onSignOut }: SettingsScreenProps) {
   const [inputVal, setInputVal] = useState(budget > 0 ? String(budget) : '');
   const [showAddCat, setShowAddCat] = useState(false);
   const [newCatLabel, setNewCatLabel] = useState('');
@@ -141,6 +142,19 @@ export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAd
           })}
         </div>
       </div>
+
+      {/* Sign Out */}
+      <div className="bg-card rounded-xl p-4 shadow-card">
+        <p className="text-sm font-semibold text-foreground mb-3">Account</p>
+        <button
+          onClick={onSignOut}
+          className="w-full h-11 rounded-xl border border-destructive/40 text-destructive font-semibold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform"
+        >
+          <LogOut size={16} />
+          Sign Out
+        </button>
+      </div>
+
     </div>
   );
 }
