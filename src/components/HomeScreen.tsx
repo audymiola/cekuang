@@ -146,5 +146,6 @@ export function HomeScreen({ expenses, categories, budget, onEdit, onDelete }: H
                     {group.label}
                   </span>
                   <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs text-muted-foreground">
-                    {formatRupiah(group.items.reduce((s, e) => s
+                 <span className="text-xs text-muted-foreground">
+  {formatRupiah(group.items.reduce((sum, e) => sum + e.amount, 0))}
+</span>
