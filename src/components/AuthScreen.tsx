@@ -5,9 +5,13 @@ import { Wallet } from 'lucide-react';
 
 type Screen = 'login' | 'signup' | 'forgot' | 'reset';
 
-export function AuthScreen() {
+interface AuthScreenProps {
+  isPasswordRecovery?: boolean;
+}
+
+export function AuthScreen({ isPasswordRecovery }: AuthScreenProps) {
   const { signIn, signUp, resetPassword } = useAuth();
-  const [screen, setScreen] = useState<Screen>('login');
+  const [screen, setScreen] = useState<Screen>(isPasswordRecovery ? 'reset' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -16,21 +20,9 @@ export function AuthScreen() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-// Detect reset token via Supabase auth event
-useEffect(() => {
-  const hash = window.location.hash;
-  if (hash.includes('access_token')) {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setScreen('reset');
-    });
-  }
-
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-    if (event === 'PASSWORD_RECOVERY') setScreen('reset');
-  });
-
-  return () => subscription.unsubscribe();
-}, []);
+  useEffect(() => {
+    if (isPasswordRecovery) setScreen('reset');
+  }, [isPasswordRecovery]);
 
   const reset = () => { setError(''); setMessage(''); setEmail(''); setPassword(''); };
 
@@ -43,11 +35,9 @@ useEffect(() => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) setError(error.message);
     else {
-      setMessage('Password updated successfully! Redirecting to login...');
-      setTimeout(() => {
-        window.location.hash = '';
-        setScreen('login');
-      }, 2000);
+      setMessage('Password updated! Redirecting to login...');
+      await supabase.auth.signOut();
+      setTimeout(() => setScreen('login'), 2000);
     }
     setLoading(false);
   };
@@ -92,7 +82,6 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-[390px]">
-        {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center mb-3 shadow-elevated">
             <Wallet size={28} className="text-primary-foreground" />
@@ -101,11 +90,9 @@ useEffect(() => {
           <p className="text-sm text-muted-foreground mt-1">Track your daily expenses</p>
         </div>
 
-        {/* Card */}
         <div className="bg-card rounded-2xl shadow-card p-6">
           <h2 className="text-lg font-bold text-foreground mb-5">{getTitle()}</h2>
 
-          {/* Reset password form */}
           {screen === 'reset' ? (
             <div className="space-y-3">
               <div>
@@ -140,7 +127,6 @@ useEffect(() => {
               </button>
             </div>
           ) : (
-            /* Login / Signup / Forgot forms */
             <div className="space-y-3">
               <div>
                 <label className="text-sm font-medium text-foreground mb-1 block">Email</label>
