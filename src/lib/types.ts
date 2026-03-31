@@ -11,6 +11,7 @@ export interface Category {
   key: string;
   label: string;
   icon: string;
+  budget?: number;
 }
 
 export const DEFAULT_CATEGORIES: Category[] = [

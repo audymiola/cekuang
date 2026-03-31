@@ -67,5 +67,10 @@ export function useExpenses(user: User) {
     setCategories(prev => prev.filter(c => c.key !== key));
   }, [user]);
 
-  return { expenses, budget, categories, loaded, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory };
+  const updateCategoryBudget = useCallback(async (key: string, budget: number) => {
+    await supabase.from('categories').update({ budget }).eq('key', key).eq('user_id', user.id);
+    setCategories(prev => prev.map(c => c.key === key ? { ...c, budget } : c));
+  }, [user]);
+
+  return { expenses, budget, categories, loaded, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory, updateCategoryBudget };
 }

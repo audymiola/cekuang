@@ -13,7 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = ({ user }: { user: User }) => {
-  const { expenses, budget, categories, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory } = useExpenses(user);
+  const { expenses, budget, categories, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory, updateCategoryBudget } = useExpenses(user);
   const { signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -58,7 +58,7 @@ const { toast } = useToast();
           )}
           {activeTab === 'settings' && (
             <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-              <SettingsScreen budget={budget} expenses={expenses} categories={categories} onSetBudget={setBudget} onAddCategory={addCategory} onDeleteCategory={deleteCategory} onSignOut={signOut} />
+              <SettingsScreen budget={budget} expenses={expenses} categories={categories} onSetBudget={setBudget} onAddCategory={addCategory} onDeleteCategory={deleteCategory} onUpdateCategoryBudget={updateCategoryBudget} onSignOut={signOut} />
             </motion.div>
           )}
         </AnimatePresence>

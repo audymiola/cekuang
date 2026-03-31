@@ -13,7 +13,9 @@ interface SettingsScreenProps {
   onSetBudget: (amount: number) => void;
   onAddCategory: (cat: Category) => void;
   onDeleteCategory: (key: string) => void;
+  onUpdateCategoryBudget: (key: string, budget: number) => void;
   onSignOut: () => void;
+
 }
 
 const formatInput = (val: string): string => {
@@ -24,11 +26,11 @@ const formatInput = (val: string): string => {
 
 const parseInput = (val: string): number => Number(val.replace(/\./g, ''));
 
-export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAddCategory, onDeleteCategory, onSignOut }: SettingsScreenProps) {
+export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAddCategory, onDeleteCategory, onUpdateCategoryBudget, onSignOut }: SettingsScreenProps) {
   const [showAddCat, setShowAddCat] = useState(false);
   const [newCatLabel, setNewCatLabel] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('');
-  const [catBudgets, setCatBudgets] = useState<Record<string, string>>({});
+  const [catBudgetInputs, setCatBudgetInputs] = useState<Record<string, string>>({});
   const [editingBudget, setEditingBudget] = useState<string | null>(null);
 
   const now = new Date();
@@ -54,13 +56,18 @@ export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAd
     setShowAddCat(false);
   };
 
-  const getBudgetWarning = (total: number, budgetStr: string) => {
-    const budget = parseInput(budgetStr);
-    if (!budget) return null;
-    const pct = total / budget;
+  const getBudgetWarning = (total: number, budgetNum: number) => {
+    if (!budgetNum) return null;
+    const pct = total / budgetNum;
     if (pct >= 1) return 'exceeded';
     if (pct >= 0.8) return 'warning';
     return null;
+  };
+
+  const getCatBudgetDisplay = (cat: Category) => {
+    // Use input value if currently editing, otherwise use saved value
+    if (catBudgetInputs[cat.key] !== undefined) return catBudgetInputs[cat.key];
+    return cat.budget ? cat.budget.toLocaleString('id-ID') : '';
   };
 
   return (
@@ -104,11 +111,10 @@ export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAd
 
         <div className="space-y-2">
           {categoryTotals.map(cat => {
-            const hasExpenses = monthExpenses.some(e => e.category === cat.key);
-            const budgetStr = catBudgets[cat.key] || '';
-            const warning = getBudgetWarning(cat.total, budgetStr);
-            const budgetNum = parseInput(budgetStr);
-            const isEditing = editingBudget === cat.key;
+            const budgetStr = getCatBudgetDisplay(cat);
+                const budgetNum = cat.budget || 0;
+                const warning = getBudgetWarning(cat.total, budgetNum);
+                const isEditing = editingBudget === cat.key;
 
             return (
               <div
@@ -150,22 +156,27 @@ export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAd
                 {/* Budget per category */}
                 {isEditing ? (
                   <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Set budget (Rp)"
-                      value={budgetStr}
-                      onChange={e => setCatBudgets(prev => ({ ...prev, [cat.key]: formatInput(e.target.value) }))}
-                      className="h-9 text-sm flex-1"
-                      autoFocus
-                    />
-                    <Button
-                      size="sm"
-                      className="h-9 px-3 text-xs"
-                      onClick={() => setEditingBudget(null)}
-                    >
-                      Done
-                    </Button>
+                   <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Set budget (Rp)"
+                    value={budgetStr}
+                    onChange={e => setCatBudgetInputs(prev => ({ ...prev, [cat.key]: formatInput(e.target.value) }))}
+                    className="h-9 text-sm flex-1"
+                    autoFocus
+                  />
+                  <Button
+                    size="sm"
+                    className="h-9 px-3 text-xs"
+                    onClick={() => {
+                      const val = parseInput(catBudgetInputs[cat.key] || '');
+                      onUpdateCategoryBudget(cat.key, val);
+                      setCatBudgetInputs(prev => { const n = {...prev}; delete n[cat.key]; return n; });
+                      setEditingBudget(null);
+                    }}
+                  >
+                    Done
+                  </Button>
                   </div>
                 ) : (
                   <button
