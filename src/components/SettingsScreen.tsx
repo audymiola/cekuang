@@ -142,14 +142,14 @@ export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAd
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-sm font-bold text-foreground">{formatRupiah(cat.total)}</span>
-                    {!hasExpenses && (
-                      <button
-                        onClick={() => onDeleteCategory(cat.key)}
-                        className="w-7 h-7 rounded-md bg-destructive/10 flex items-center justify-center text-destructive"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
+                    {!monthExpenses.some(e => e.category === cat.key) && (
+  <button
+    onClick={() => onDeleteCategory(cat.key)}
+    className="w-7 h-7 rounded-md bg-destructive/10 flex items-center justify-center text-destructive"
+  >
+    <Trash2 size={13} />
+  </button>
+)}
                   </div>
                 </div>
 
