@@ -155,29 +155,41 @@ export function SettingsScreen({ budget, expenses, categories, onSetBudget, onAd
 
                 {/* Budget per category */}
                 {isEditing ? (
-                  <div className="flex gap-2">
-                   <Input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="Set budget (Rp)"
-                    value={budgetStr}
-                    onChange={e => setCatBudgetInputs(prev => ({ ...prev, [cat.key]: formatInput(e.target.value) }))}
-                    className="h-9 text-sm flex-1"
-                    autoFocus
-                  />
-                  <Button
-                    size="sm"
-                    className="h-9 px-3 text-xs"
-                    onClick={() => {
-                      const val = parseInput(catBudgetInputs[cat.key] || '');
-                      onUpdateCategoryBudget(cat.key, val);
-                      setCatBudgetInputs(prev => { const n = {...prev}; delete n[cat.key]; return n; });
-                      setEditingBudget(null);
-                    }}
-                  >
-                    Done
-                  </Button>
-                  </div>
+  <div className="flex gap-2">
+    <Input
+      type="text"
+      inputMode="numeric"
+      placeholder="Set budget (Rp)"
+      value={budgetStr}
+      onChange={e => setCatBudgetInputs(prev => ({ ...prev, [cat.key]: formatInput(e.target.value) }))}
+      className="h-9 text-sm flex-1"
+      autoFocus
+    />
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-9 px-3 text-xs text-destructive border-destructive/30"
+      onClick={() => {
+        onUpdateCategoryBudget(cat.key, 0);
+        setCatBudgetInputs(prev => { const n = {...prev}; delete n[cat.key]; return n; });
+        setEditingBudget(null);
+      }}
+    >
+      Clear
+    </Button>
+    <Button
+      size="sm"
+      className="h-9 px-3 text-xs"
+      onClick={() => {
+        const val = parseInput(catBudgetInputs[cat.key] || '0');
+        onUpdateCategoryBudget(cat.key, val);
+        setCatBudgetInputs(prev => { const n = {...prev}; delete n[cat.key]; return n; });
+        setEditingBudget(null);
+      }}
+    >
+      Done
+    </Button>
+  </div>
                 ) : (
                   <button
                     onClick={() => setEditingBudget(cat.key)}
