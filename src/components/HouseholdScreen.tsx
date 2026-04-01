@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useHousehold } from '@/hooks/useHousehold';
 import { User } from '@supabase/supabase-js';
-import { Users, Copy, UserMinus, LogOut, Crown, Clock } from 'lucide-react';
+import { Users, Copy, UserMinus, LogOut, Crown, Clock, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -10,21 +10,37 @@ interface HouseholdScreenProps {
 }
 
 export function HouseholdScreen({ user }: HouseholdScreenProps) {
-  const { household, members, generateInviteCode, joinHousehold, kickMember, leaveHousehold } = useHousehold(user);
+  const { household, members, createHousehold, deleteHousehold, generateInviteCode, joinHousehold, kickMember, leaveHousehold } = useHousehold(user);
   const [inviteCode, setInviteCode] = useState('');
   const [inviteExpiry, setInviteExpiry] = useState('');
   const [joinCode, setJoinCode] = useState('');
+  const [householdName, setHouseholdName] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [showJoinForm, setShowJoinForm] = useState(false);
 
   const isAdmin = household?.admin_id === user.id;
   const isFull = members.length >= 3;
-  // Only show leave if user is a non-admin member with other members in the household
-  const canLeave = !isAdmin && members.some(m => m.user_id === user.id);
-  // Only show join if user has no household or is solo admin
-  const canJoin = !isAdmin || (isAdmin && members.length === 1);
+
+  const handleCreate = async () => {
+    if (!householdName.trim()) return;
+    setLoading(true);
+    setError('');
+    const result = await createHousehold(householdName.trim());
+    if (result?.error) setError(result.error);
+    else setMessage('Household created successfully!');
+    setLoading(false);
+    setShowCreateForm(false);
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Delete household? All members will be removed but expenses will remain.')) return;
+    setLoading(true);
+    await deleteHousehold();
+    setLoading(false);
+  };
 
   const handleGenerateInvite = async () => {
     setLoading(true);
@@ -70,37 +86,106 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
     await leaveHousehold();
   };
 
-  return (
-    <div className="space-y-5">
-      <h1 className="text-xl font-bold text-foreground">Household</h1>
+  // No household — show create or join options
+  if (!household) {
+    return (
+      <div className="space-y-5">
+        <h1 className="text-xl font-bold text-foreground">Household</h1>
 
-      {/* Members list */}
-      <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Users size={15} /> Members ({members.length}/3)
+        <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
+          <p className="text-sm text-muted-foreground">
+            You're currently tracking expenses solo. Create or join a household to share expenses with others.
           </p>
-          {canJoin && !isFull && (
-            <button
-              onClick={() => setShowJoinForm(!showJoinForm)}
-              className="text-xs text-primary font-medium"
-            >
-              {showJoinForm ? 'Cancel' : 'Join a household'}
-            </button>
+        </div>
+
+        {/* Create household */}
+        <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
+          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Plus size={15} /> Create a Household
+          </p>
+          <p className="text-xs text-muted-foreground">Start a shared household and invite your family or partner.</p>
+          {!showCreateForm ? (
+            <Button onClick={() => { setShowCreateForm(true); setShowJoinForm(false); }} className="w-full h-11 font-semibold">
+              Create Household
+            </Button>
+          ) : (
+            <div className="space-y-2">
+              <Input
+                placeholder="Household name (e.g. Our Family)"
+                value={householdName}
+                onChange={e => setHouseholdName(e.target.value)}
+                className="h-10 text-sm"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowCreateForm(false)} className="flex-1 h-10">
+                  Cancel
+                </Button>
+                <Button onClick={handleCreate} disabled={loading} className="flex-1 h-10 font-semibold">
+                  {loading ? 'Creating...' : 'Create'}
+                </Button>
+              </div>
+            </div>
           )}
         </div>
 
-        {members.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-2">
-            No members yet. Setting up your household...
+        {/* Join household */}
+        <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
+          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Users size={15} /> Join a Household
           </p>
-        )}
+          <p className="text-xs text-muted-foreground">Enter an invite code shared by a household admin.</p>
+          {!showJoinForm ? (
+            <Button variant="outline" onClick={() => { setShowJoinForm(true); setShowCreateForm(false); }} className="w-full h-11 font-semibold">
+              Join with Invite Code
+            </Button>
+          ) : (
+            <div className="space-y-2">
+              <Input
+                placeholder="Enter invite code (e.g. ABC123)"
+                value={joinCode}
+                onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                className="h-10 text-sm uppercase tracking-widest"
+                maxLength={6}
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowJoinForm(false)} className="flex-1 h-10">
+                  Cancel
+                </Button>
+                <Button onClick={handleJoin} disabled={loading} className="flex-1 h-10 font-semibold">
+                  {loading ? 'Joining...' : 'Join'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {error && <p className="text-xs text-destructive px-1">{error}</p>}
+        {message && <p className="text-xs text-green-600 px-1">{message}</p>}
+      </div>
+    );
+  }
+
+  // Has household
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-foreground">Household</h1>
+        <span className="text-sm font-medium text-muted-foreground">{household.name}</span>
+      </div>
+
+      {/* Members list */}
+      <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
+        <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Users size={15} /> Members ({members.length}/3)
+        </p>
 
         <div className="space-y-2">
           {members.map(member => (
             <div key={member.id} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                {household?.admin_id === member.user_id && (
+                {household.admin_id === member.user_id && (
                   <Crown size={13} className="text-amber-500 shrink-0" />
                 )}
                 <span className="text-sm text-foreground truncate">{member.email}</span>
@@ -119,54 +204,26 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
             </div>
           ))}
         </div>
-
-        {/* Join form */}
-        {showJoinForm && (
-          <div className="space-y-2 pt-1 border-t border-border">
-            <p className="text-xs text-muted-foreground pt-2">Enter the invite code shared by the household admin:</p>
-            <Input
-              placeholder="Enter invite code (e.g. ABC123)"
-              value={joinCode}
-              onChange={e => setJoinCode(e.target.value.toUpperCase())}
-              className="h-10 text-sm uppercase tracking-widest"
-              maxLength={6}
-            />
-            <Button onClick={handleJoin} disabled={loading} size="sm" className="w-full h-10 font-semibold">
-              {loading ? 'Joining...' : 'Join Household'}
-            </Button>
-          </div>
-        )}
       </div>
 
-      {/* Invite section — admin only, not full */}
+      {/* Invite section — admin only */}
       {isAdmin && !isFull && (
         <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
           <p className="text-sm font-semibold text-foreground">Invite Member</p>
           <p className="text-xs text-muted-foreground">Generate a single-use invite code valid for 24 hours.</p>
-          <Button
-            onClick={handleGenerateInvite}
-            disabled={loading}
-            className="w-full h-11 font-semibold"
-          >
+          <Button onClick={handleGenerateInvite} disabled={loading} className="w-full h-11 font-semibold">
             {loading ? 'Generating...' : 'Generate Invite Code'}
           </Button>
-
           {inviteCode && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg">
                 <span className="text-xl font-mono font-bold text-primary flex-1 tracking-widest">{inviteCode}</span>
-                <button
-                  onClick={handleCopy}
-                  className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary"
-                >
+                <button onClick={handleCopy} className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <Copy size={14} />
                 </button>
               </div>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Clock size={11} /> Expires: {inviteExpiry}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Share the code directly, or copy the invite link.
               </p>
             </div>
           )}
@@ -182,8 +239,8 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
       {error && <p className="text-xs text-destructive px-1">{error}</p>}
       {message && <p className="text-xs text-green-600 px-1">{message}</p>}
 
-      {/* Leave household — only for non-admin members */}
-      {canLeave && (
+      {/* Leave — non-admin only */}
+      {!isAdmin && (
         <div className="bg-card rounded-xl p-4 shadow-card">
           <button
             onClick={handleLeave}
@@ -191,6 +248,19 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
           >
             <LogOut size={16} />
             Leave Household
+          </button>
+        </div>
+      )}
+
+      {/* Delete — admin only */}
+      {isAdmin && (
+        <div className="bg-card rounded-xl p-4 shadow-card">
+          <button
+            onClick={handleDelete}
+            className="w-full h-11 rounded-xl border border-destructive/40 text-destructive font-semibold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform"
+          >
+            <Trash2 size={16} />
+            Delete Household
           </button>
         </div>
       )}

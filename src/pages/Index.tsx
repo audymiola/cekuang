@@ -46,11 +46,11 @@ const Index = ({ user }: { user: User }) => {
   };
 
   // Show loading until household is ready
-  if (householdLoading || !household) return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <p className="text-muted-foreground text-sm">Loading your household...</p>
-    </div>
-  );
+  if (householdLoading) return (
+  <div className="min-h-screen bg-background flex items-center justify-center">
+    <p className="text-muted-foreground text-sm">Loading harap bersabar...</p>
+  </div>
+);
 
   return (
     <div className="min-h-screen bg-background">

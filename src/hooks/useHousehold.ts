@@ -36,7 +36,6 @@ export function useHousehold(user: User) {
       .single();
 
     if (memberRow) {
-      // Load household details
       const { data: hh } = await supabase
         .from('households')
         .select('*')
@@ -45,7 +44,6 @@ export function useHousehold(user: User) {
 
       if (hh) {
         setHousehold(hh);
-        // Load members
         const { data: membersList } = await supabase
           .from('household_members')
           .select('*')
@@ -53,43 +51,59 @@ export function useHousehold(user: User) {
         if (membersList) setMembers(membersList);
       }
     } else {
-      // No household — create one for this user
-      const { data: newHH } = await supabase
-        .from('households')
-        .insert({ admin_id: user.id, name: 'My Household' })
-        .select()
-        .single();
-
-      if (newHH) {
-        setHousehold(newHH);
-        // Add self as member
-        const { data: selfMember } = await supabase
-          .from('household_members')
-          .insert({ household_id: newHH.id, user_id: user.id, email: user.email! })
-          .select()
-          .single();
-        if (selfMember) setMembers([selfMember]);
-      }
+      // No household — that's fine, solo mode
+      setHousehold(null);
+      setMembers([]);
     }
 
     setLoading(false);
   };
 
-  const generateInviteCode = useCallback(async () => {
-    if (!household) return null;
-    if (members.length >= 3) return { error: 'Household is full (max 3 members)' };
+  const createHousehold = useCallback(async (name: string) => {
+    // Create household
+    const { data: newHH, error } = await supabase
+      .from('households')
+      .insert({ admin_id: user.id, name })
+      .select()
+      .single();
 
-    // Check if user is admin
+    if (error) return { error: error.message };
+
+    // Add self as member
+    await supabase
+      .from('household_members')
+      .insert({ household_id: newHH.id, user_id: user.id, email: user.email! });
+
+    await loadHousehold();
+    return { success: true };
+  }, [user]);
+
+  const deleteHousehold = useCallback(async () => {
+    if (!household) return;
+    if (household.admin_id !== user.id) return { error: 'Only admin can delete household' };
+
+    // Delete all members first
+    await supabase.from('household_members').delete().eq('household_id', household.id);
+    // Delete household (expenses stay, household_id just becomes orphaned)
+    await supabase.from('households').delete().eq('id', household.id);
+
+    setHousehold(null);
+    setMembers([]);
+    return { success: true };
+  }, [household, user]);
+
+  const generateInviteCode = useCallback(async () => {
+    if (!household) return { error: 'No household found' };
+    if (members.length >= 3) return { error: 'Household is full (max 3 members)' };
     if (household.admin_id !== user.id) return { error: 'Only admin can invite members' };
 
-    // Invalidate old unused codes first
+    // Invalidate old unused codes
     await supabase
       .from('household_invites')
       .update({ used: true })
       .eq('household_id', household.id)
       .eq('used', false);
 
-    // Generate new code
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
@@ -111,7 +125,7 @@ export function useHousehold(user: User) {
       .eq('user_id', user.id)
       .single();
 
-    if (existing) return { error: 'You are already in a household. Leave it first before joining another.' };
+    if (existing) return { error: 'You are already in a household. Leave it first.' };
 
     // Validate code
     const { data: invite } = await supabase
@@ -124,7 +138,7 @@ export function useHousehold(user: User) {
     if (!invite) return { error: 'Invalid or expired invite code.' };
     if (new Date(invite.expires_at) < new Date()) return { error: 'This invite code has expired.' };
 
-    // Check household capacity
+    // Check capacity
     const { data: currentMembers } = await supabase
       .from('household_members')
       .select('id')
@@ -132,18 +146,17 @@ export function useHousehold(user: User) {
 
     if (currentMembers && currentMembers.length >= 3) return { error: 'This household is already full.' };
 
-    // Join household
+    // Join
     await supabase
       .from('household_members')
       .insert({ household_id: invite.household_id, user_id: user.id, email: user.email! });
 
-    // Mark invite as used
+    // Mark invite used
     await supabase
       .from('household_invites')
       .update({ used: true })
       .eq('id', invite.id);
 
-    // Reload
     await loadHousehold();
     return { success: true };
   }, [user]);
@@ -154,8 +167,7 @@ export function useHousehold(user: User) {
     await supabase
       .from('household_members')
       .delete()
-      .eq('id', memberId)
-      .neq('user_id', household.admin_id); // Can't kick admin
+      .eq('id', memberId);
 
     setMembers(prev => prev.filter(m => m.id !== memberId));
     return { success: true };
@@ -163,26 +175,15 @@ export function useHousehold(user: User) {
 
   const leaveHousehold = useCallback(async () => {
     if (!household) return;
-    if (household.admin_id === user.id) {
-      // Admin leaving — dissolve household if alone, else transfer
-      if (members.length === 1) {
-        await supabase.from('households').delete().eq('id', household.id);
-      } else {
-        // Transfer admin to next member
-        const nextAdmin = members.find(m => m.user_id !== user.id);
-        if (nextAdmin) {
-          await supabase.from('households').update({ admin_id: nextAdmin.user_id }).eq('id', household.id);
-        }
-        await supabase.from('household_members').delete().eq('user_id', user.id).eq('household_id', household.id);
-      }
-    } else {
-      await supabase.from('household_members').delete().eq('user_id', user.id).eq('household_id', household.id);
-    }
+    await supabase
+      .from('household_members')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('household_id', household.id);
 
     setHousehold(null);
     setMembers([]);
-    await loadHousehold(); // Will create a new personal household
-  }, [household, members, user]);
+  }, [household, user]);
 
-  return { household, members, loading, generateInviteCode, joinHousehold, kickMember, leaveHousehold };
+  return { household, members, loading, createHousehold, deleteHousehold, generateInviteCode, joinHousehold, kickMember, leaveHousehold };
 }

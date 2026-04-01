@@ -10,11 +10,23 @@ export function useExpenses(user: User, householdId: string | null) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (!user || !householdId) return;
+    if (!user) return;
     const load = async () => {
+      setLoaded(false);
+
+      // Load expenses — by household if exists, otherwise by user
+      const expQuery = householdId
+        ? supabase.from('expenses').select('*').eq('household_id', householdId).order('date', { ascending: false })
+        : supabase.from('expenses').select('*').eq('user_id', user.id).is('household_id', null).order('date', { ascending: false });
+
+      // Load categories — by household if exists, otherwise by user
+      const catQuery = householdId
+        ? supabase.from('categories').select('*').eq('household_id', householdId)
+        : supabase.from('categories').select('*').eq('user_id', user.id).is('household_id', null);
+
       const [{ data: exp }, { data: cats }, { data: bud }] = await Promise.all([
-        supabase.from('expenses').select('*').eq('household_id', householdId).order('date', { ascending: false }),
-        supabase.from('categories').select('*').eq('household_id', householdId),
+        expQuery,
+        catQuery,
         supabase.from('budgets').select('*').eq('user_id', user.id).single(),
       ]);
 
@@ -23,14 +35,14 @@ export function useExpenses(user: User, householdId: string | null) {
       if (cats && cats.length > 0) {
         setCategories(cats);
       } else {
-        // Seed default categories for new household
+        // Seed default categories
         const toInsert = DEFAULT_CATEGORIES.map(c => ({
           key: c.key,
           label: c.label,
           icon: c.icon,
           budget: 0,
           user_id: user.id,
-          household_id: householdId,
+          household_id: householdId ?? null,
         }));
         const { data: inserted } = await supabase.from('categories').insert(toInsert).select();
         if (inserted && inserted.length > 0) setCategories(inserted);
@@ -45,7 +57,7 @@ export function useExpenses(user: User, householdId: string | null) {
   const addExpense = useCallback(async (expense: Omit<Expense, 'id'>) => {
     const { data } = await supabase
       .from('expenses')
-      .insert({ ...expense, user_id: user.id, household_id: householdId })
+      .insert({ ...expense, user_id: user.id, household_id: householdId ?? null })
       .select()
       .single();
     if (data) setExpenses(prev => [data, ...prev]);
@@ -74,21 +86,21 @@ export function useExpenses(user: User, householdId: string | null) {
   const addCategory = useCallback(async (cat: Category) => {
     const { data } = await supabase
       .from('categories')
-      .insert({ ...cat, user_id: user.id, household_id: householdId })
+      .insert({ ...cat, user_id: user.id, household_id: householdId ?? null })
       .select()
       .single();
     if (data) setCategories(prev => [...prev, data]);
   }, [user, householdId]);
 
   const deleteCategory = useCallback(async (key: string) => {
-    await supabase.from('categories').delete().eq('key', key).eq('household_id', householdId);
+    await supabase.from('categories').delete().eq('key', key).eq('user_id', user.id);
     setCategories(prev => prev.filter(c => c.key !== key));
-  }, [householdId]);
+  }, [user]);
 
   const updateCategoryBudget = useCallback(async (key: string, budget: number) => {
-    await supabase.from('categories').update({ budget }).eq('key', key).eq('household_id', householdId);
+    await supabase.from('categories').update({ budget }).eq('key', key).eq('user_id', user.id);
     setCategories(prev => prev.map(c => c.key === key ? { ...c, budget } : c));
-  }, [householdId]);
+  }, [user]);
 
   return { expenses, budget, categories, loaded, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory, updateCategoryBudget };
 }
