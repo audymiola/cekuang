@@ -15,7 +15,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = ({ user }: { user: User }) => {
-  const { household, members, loading: householdLoading } = useHousehold(user);
+  const {
+    household, members, loading: householdLoading,
+    activeInviteCode, activeInviteExpiry,
+    createHousehold, deleteHousehold, generateInviteCode,
+    joinHousehold, kickMember, leaveHousehold
+  } = useHousehold(user);
+
   const { expenses, budget, categories, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory, updateCategoryBudget } = useExpenses(user, household?.id ?? null);
   const { signOut } = useAuth();
   const { toast } = useToast();
@@ -45,12 +51,11 @@ const Index = ({ user }: { user: User }) => {
     setEditingExpense(null);
   };
 
-  // Show loading until household is ready
   if (householdLoading) return (
-  <div className="min-h-screen bg-background flex items-center justify-center">
-    <p className="text-muted-foreground text-sm">Loading harap bersabar...</p>
-  </div>
-);
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <p className="text-muted-foreground text-sm">Loading...</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -68,7 +73,19 @@ const Index = ({ user }: { user: User }) => {
           )}
           {activeTab === 'household' && (
             <motion.div key="household" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-              <HouseholdScreen user={user} />
+              <HouseholdScreen
+                user={user}
+                household={household}
+                members={members}
+                activeInviteCode={activeInviteCode}
+                activeInviteExpiry={activeInviteExpiry}
+                onCreateHousehold={createHousehold}
+                onDeleteHousehold={deleteHousehold}
+                onGenerateInviteCode={generateInviteCode}
+                onJoinHousehold={joinHousehold}
+                onKickMember={kickMember}
+                onLeaveHousehold={leaveHousehold}
+              />
             </motion.div>
           )}
           {activeTab === 'settings' && (
