@@ -3,39 +3,53 @@ import { Expense, Category, DEFAULT_CATEGORIES } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
 
-export function useExpenses(user: User) {
+export function useExpenses(user: User, householdId: string | null) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budget, setBudgetState] = useState<number>(0);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [loaded, setLoaded] = useState(false);
 
-  // Load all data on mount
   useEffect(() => {
-    if (!user) return;
+    if (!user || !householdId) return;
     const load = async () => {
       const [{ data: exp }, { data: cats }, { data: bud }] = await Promise.all([
-        supabase.from('expenses').select('*').eq('user_id', user.id).order('date', { ascending: false }),
-        supabase.from('categories').select('*').eq('user_id', user.id),
+        supabase.from('expenses').select('*').eq('household_id', householdId).order('date', { ascending: false }),
+        supabase.from('categories').select('*').eq('household_id', householdId),
         supabase.from('budgets').select('*').eq('user_id', user.id).single(),
       ]);
+
       if (exp) setExpenses(exp);
-      if (cats && cats.length > 0) setCategories(cats);
-      else {
-        // Seed default categories for new user
-        const toInsert = DEFAULT_CATEGORIES.map(c => ({ ...c, user_id: user.id }));
+
+      if (cats && cats.length > 0) {
+        setCategories(cats);
+      } else {
+        // Seed default categories for new household
+        const toInsert = DEFAULT_CATEGORIES.map(c => ({
+          key: c.key,
+          label: c.label,
+          icon: c.icon,
+          budget: 0,
+          user_id: user.id,
+          household_id: householdId,
+        }));
         const { data: inserted } = await supabase.from('categories').insert(toInsert).select();
-        if (inserted) setCategories(inserted);
+        if (inserted && inserted.length > 0) setCategories(inserted);
       }
+
       if (bud) setBudgetState(bud.amount);
       setLoaded(true);
     };
     load();
-  }, [user]);
+  }, [user, householdId]);
 
   const addExpense = useCallback(async (expense: Omit<Expense, 'id'>) => {
-    const { data } = await supabase.from('expenses').insert({ ...expense, user_id: user.id }).select().single();
+    const { data } = await supabase
+      .from('expenses')
+      .insert({ ...expense, user_id: user.id, household_id: householdId })
+      .select()
+      .single();
     if (data) setExpenses(prev => [data, ...prev]);
-  }, [user]);
+  }, [user, householdId]);
 
   const updateExpense = useCallback(async (id: string, data: Omit<Expense, 'id'>) => {
     await supabase.from('expenses').update(data).eq('id', id);
@@ -58,19 +72,23 @@ export function useExpenses(user: User) {
   }, [user]);
 
   const addCategory = useCallback(async (cat: Category) => {
-    const { data } = await supabase.from('categories').insert({ ...cat, user_id: user.id }).select().single();
+    const { data } = await supabase
+      .from('categories')
+      .insert({ ...cat, user_id: user.id, household_id: householdId })
+      .select()
+      .single();
     if (data) setCategories(prev => [...prev, data]);
-  }, [user]);
+  }, [user, householdId]);
 
   const deleteCategory = useCallback(async (key: string) => {
-    await supabase.from('categories').delete().eq('key', key).eq('user_id', user.id);
+    await supabase.from('categories').delete().eq('key', key).eq('household_id', householdId);
     setCategories(prev => prev.filter(c => c.key !== key));
-  }, [user]);
+  }, [householdId]);
 
   const updateCategoryBudget = useCallback(async (key: string, budget: number) => {
-    await supabase.from('categories').update({ budget }).eq('key', key).eq('user_id', user.id);
+    await supabase.from('categories').update({ budget }).eq('key', key).eq('household_id', householdId);
     setCategories(prev => prev.map(c => c.key === key ? { ...c, budget } : c));
-  }, [user]);
+  }, [householdId]);
 
   return { expenses, budget, categories, loaded, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory, updateCategoryBudget };
 }

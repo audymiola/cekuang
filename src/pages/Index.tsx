@@ -4,7 +4,9 @@ import { HomeScreen } from '@/components/HomeScreen';
 import { ExpenseForm } from '@/components/ExpenseForm';
 import { ChartsScreen } from '@/components/ChartsScreen';
 import { SettingsScreen } from '@/components/SettingsScreen';
+import { HouseholdScreen } from '@/components/HouseholdScreen';
 import { useExpenses } from '@/hooks/useExpenses';
+import { useHousehold } from '@/hooks/useHousehold';
 import { Expense } from '@/lib/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
@@ -13,19 +15,20 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = ({ user }: { user: User }) => {
-  const { expenses, budget, categories, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory, updateCategoryBudget } = useExpenses(user);
+  const { household, loading: householdLoading } = useHousehold(user);
+  const { expenses, budget, categories, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory, updateCategoryBudget } = useExpenses(user, household?.id ?? null);
   const { signOut } = useAuth();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-const { toast } = useToast();
 
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
     setShowAddForm(true);
   };
 
- const handleSave = (data: Omit<Expense, 'id'>) => {
+  const handleSave = (data: Omit<Expense, 'id'>) => {
     if (editingExpense) {
       updateExpense(editingExpense.id, data);
       setEditingExpense(null);
@@ -42,6 +45,12 @@ const { toast } = useToast();
     setEditingExpense(null);
   };
 
+  if (householdLoading) return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <p className="text-muted-foreground text-sm">Loading...</p>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-[430px] px-4 pt-6 pb-24">
@@ -56,6 +65,11 @@ const { toast } = useToast();
               <ChartsScreen expenses={expenses} categories={categories} />
             </motion.div>
           )}
+          {activeTab === 'household' && (
+            <motion.div key="household" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+              <HouseholdScreen user={user} />
+            </motion.div>
+          )}
           {activeTab === 'settings' && (
             <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <SettingsScreen budget={budget} expenses={expenses} categories={categories} onSetBudget={setBudget} onAddCategory={addCategory} onDeleteCategory={deleteCategory} onUpdateCategoryBudget={updateCategoryBudget} onSignOut={signOut} />
@@ -64,7 +78,7 @@ const { toast } = useToast();
         </AnimatePresence>
       </div>
 
-      {!showAddForm && (
+      {!showAddForm && activeTab !== 'household' && (
         <button
           onClick={() => setShowAddForm(true)}
           className="fixed z-50 bottom-[76px] right-4 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-elevated flex items-center justify-center active:scale-95 transition-transform"

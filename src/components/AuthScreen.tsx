@@ -19,9 +19,24 @@ export function AuthScreen({ isPasswordRecovery }: AuthScreenProps) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
 
   useEffect(() => {
-    if (isPasswordRecovery) setScreen('reset');
+    if (isPasswordRecovery) { setScreen('reset'); return; }
+
+    // Detect invite code from URL
+    const params = new URLSearchParams(window.location.search);
+    const invite = params.get('invite');
+    if (invite) {
+      setInviteCode(invite);
+      setScreen('signup');
+    }
+
+    // Detect password recovery
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setScreen('reset');
+    });
+    return () => subscription.unsubscribe();
   }, [isPasswordRecovery]);
 
   const reset = () => { setError(''); setMessage(''); setEmail(''); setPassword(''); };
@@ -49,24 +64,41 @@ export function AuthScreen({ isPasswordRecovery }: AuthScreenProps) {
     if (screen !== 'forgot' && !password) { setError('Please enter your password.'); return; }
     if (screen !== 'forgot' && password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setLoading(true);
+
     if (screen === 'login') {
       const { error } = await signIn(email, password);
-      if (error) setError(error.message);
+      if (error) {
+        setError(error.message);
+      } else {
+        // Check for pending invite code after login
+        const pendingCode = localStorage.getItem('pendingInviteCode');
+        if (pendingCode) {
+          localStorage.removeItem('pendingInviteCode');
+          localStorage.setItem('joinAfterLogin', pendingCode);
+        }
+      }
     } else if (screen === 'signup') {
       const { error } = await signUp(email, password);
-      if (error) setError(error.message);
-      else setMessage('Account created! Please check your email to confirm, then log in.');
+      if (error) {
+        setError(error.message);
+      } else {
+        if (inviteCode) {
+          localStorage.setItem('pendingInviteCode', inviteCode);
+        }
+        setMessage('Account created! Please check your email to confirm, then log in.');
+      }
     } else if (screen === 'forgot') {
       const { error } = await resetPassword(email);
       if (error) setError(error.message);
       else setMessage('Password reset email sent! Check your inbox.');
     }
+
     setLoading(false);
   };
 
   const getTitle = () => {
     if (screen === 'login') return 'Welcome back';
-    if (screen === 'signup') return 'Create account';
+    if (screen === 'signup') return inviteCode ? '🎉 You\'re invited!' : 'Create account';
     if (screen === 'forgot') return 'Reset password';
     return 'Set new password';
   };
@@ -128,6 +160,16 @@ export function AuthScreen({ isPasswordRecovery }: AuthScreenProps) {
             </div>
           ) : (
             <div className="space-y-3">
+
+              {/* Invite code banner */}
+              {screen === 'signup' && inviteCode && (
+                <div className="p-3 bg-primary/10 rounded-xl">
+                  <p className="text-xs text-primary font-medium">
+                    You'll join a household after signing up. Code: <span className="font-bold">{inviteCode}</span>
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="text-sm font-medium text-foreground mb-1 block">Email</label>
                 <input
