@@ -4,7 +4,6 @@ import { User } from '@supabase/supabase-js';
 import { Users, Copy, UserMinus, LogOut, Crown, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 
 interface HouseholdScreenProps {
   user: User;
@@ -22,6 +21,10 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
 
   const isAdmin = household?.admin_id === user.id;
   const isFull = members.length >= 3;
+  // Only show leave if user is a non-admin member with other members in the household
+  const canLeave = !isAdmin && members.some(m => m.user_id === user.id);
+  // Only show join if user has no household or is solo admin
+  const canJoin = !isAdmin || (isAdmin && members.length === 1);
 
   const handleGenerateInvite = async () => {
     setLoading(true);
@@ -32,7 +35,6 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
     else if (result?.code) {
       setInviteCode(result.code);
       setInviteExpiry(new Date(result.expires_at).toLocaleString('id-ID'));
-      setMessage('');
     }
     setLoading(false);
   };
@@ -40,7 +42,7 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
   const handleCopy = () => {
     const link = `${window.location.origin}/?invite=${inviteCode}`;
     navigator.clipboard.writeText(link);
-    setMessage('Invite link copied to clipboard!');
+    setMessage('Invite link copied!');
     setTimeout(() => setMessage(''), 3000);
   };
 
@@ -50,7 +52,10 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
     setError('');
     const result = await joinHousehold(joinCode.trim());
     if (result?.error) setError(result.error);
-    else setMessage('Successfully joined household!');
+    else {
+      setMessage('Successfully joined household!');
+      setShowJoinForm(false);
+    }
     setLoading(false);
   };
 
@@ -75,26 +80,32 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
           <p className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Users size={15} /> Members ({members.length}/3)
           </p>
-          {!isAdmin && (
+          {canJoin && !isFull && (
             <button
               onClick={() => setShowJoinForm(!showJoinForm)}
               className="text-xs text-primary font-medium"
             >
-              Join a household
+              {showJoinForm ? 'Cancel' : 'Join a household'}
             </button>
           )}
         </div>
 
+        {members.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-2">
+            No members yet. Setting up your household...
+          </p>
+        )}
+
         <div className="space-y-2">
           {members.map(member => (
             <div key={member.id} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
                 {household?.admin_id === member.user_id && (
                   <Crown size={13} className="text-amber-500 shrink-0" />
                 )}
                 <span className="text-sm text-foreground truncate">{member.email}</span>
                 {member.user_id === user.id && (
-                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">You</span>
+                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium shrink-0">You</span>
                 )}
               </div>
               {isAdmin && member.user_id !== user.id && (
@@ -109,14 +120,15 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
           ))}
         </div>
 
-        {/* Join form for non-admin */}
-        {showJoinForm && !isAdmin && (
-          <div className="space-y-2 pt-1">
+        {/* Join form */}
+        {showJoinForm && (
+          <div className="space-y-2 pt-1 border-t border-border">
+            <p className="text-xs text-muted-foreground pt-2">Enter the invite code shared by the household admin:</p>
             <Input
-              placeholder="Enter invite code"
+              placeholder="Enter invite code (e.g. ABC123)"
               value={joinCode}
               onChange={e => setJoinCode(e.target.value.toUpperCase())}
-              className="h-10 text-sm uppercase"
+              className="h-10 text-sm uppercase tracking-widest"
               maxLength={6}
             />
             <Button onClick={handleJoin} disabled={loading} size="sm" className="w-full h-10 font-semibold">
@@ -126,10 +138,11 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
         )}
       </div>
 
-      {/* Invite section — admin only */}
+      {/* Invite section — admin only, not full */}
       {isAdmin && !isFull && (
         <div className="bg-card rounded-xl p-4 shadow-card space-y-3">
           <p className="text-sm font-semibold text-foreground">Invite Member</p>
+          <p className="text-xs text-muted-foreground">Generate a single-use invite code valid for 24 hours.</p>
           <Button
             onClick={handleGenerateInvite}
             disabled={loading}
@@ -141,8 +154,11 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
           {inviteCode && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg">
-                <span className="text-lg font-mono font-bold text-primary flex-1 tracking-widest">{inviteCode}</span>
-                <button onClick={handleCopy} className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                <span className="text-xl font-mono font-bold text-primary flex-1 tracking-widest">{inviteCode}</span>
+                <button
+                  onClick={handleCopy}
+                  className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary"
+                >
                   <Copy size={14} />
                 </button>
               </div>
@@ -150,7 +166,7 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
                 <Clock size={11} /> Expires: {inviteExpiry}
               </p>
               <p className="text-xs text-muted-foreground">
-                Share the code or copy the invite link. Single use, valid 24 hours.
+                Share the code directly, or copy the invite link.
               </p>
             </div>
           )}
@@ -163,11 +179,11 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
         </div>
       )}
 
-      {error && <p className="text-xs text-destructive">{error}</p>}
-      {message && <p className="text-xs text-green-600">{message}</p>}
+      {error && <p className="text-xs text-destructive px-1">{error}</p>}
+      {message && <p className="text-xs text-green-600 px-1">{message}</p>}
 
-      {/* Leave household — non-admin only */}
-      {!isAdmin && (
+      {/* Leave household — only for non-admin members */}
+      {canLeave && (
         <div className="bg-card rounded-xl p-4 shadow-card">
           <button
             onClick={handleLeave}
