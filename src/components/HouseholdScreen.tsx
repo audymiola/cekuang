@@ -10,9 +10,9 @@ interface HouseholdScreenProps {
 }
 
 export function HouseholdScreen({ user }: HouseholdScreenProps) {
-  const { household, members, createHousehold, deleteHousehold, generateInviteCode, joinHousehold, kickMember, leaveHousehold } = useHousehold(user);
-  const [inviteCode, setInviteCode] = useState('');
-  const [inviteExpiry, setInviteExpiry] = useState('');
+  const { household, members, activeInviteCode, activeInviteExpiry, createHousehold, deleteHousehold, generateInviteCode, joinHousehold, kickMember, leaveHousehold } = useHousehold(user);
+const inviteCode = activeInviteCode || '';
+const inviteExpiry = activeInviteExpiry ? new Date(activeInviteExpiry).toLocaleString('id-ID') : '';
   const [joinCode, setJoinCode] = useState('');
   const [householdName, setHouseholdName] = useState('');
   const [message, setMessage] = useState('');
@@ -43,17 +43,13 @@ export function HouseholdScreen({ user }: HouseholdScreenProps) {
   };
 
   const handleGenerateInvite = async () => {
-    setLoading(true);
-    setError('');
-    setMessage('');
-    const result = await generateInviteCode();
-    if (result?.error) setError(result.error);
-    else if (result?.code) {
-      setInviteCode(result.code);
-      setInviteExpiry(new Date(result.expires_at).toLocaleString('id-ID'));
-    }
-    setLoading(false);
-  };
+  setLoading(true);
+  setError('');
+  setMessage('');
+  const result = await generateInviteCode();
+  if (result?.error) setError(result.error);
+  setLoading(false);
+};
 
   const handleCopy = () => {
     const link = `${window.location.origin}/?invite=${inviteCode}`;

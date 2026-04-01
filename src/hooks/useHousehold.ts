@@ -19,6 +19,8 @@ export function useHousehold(user: User) {
   const [household, setHousehold] = useState<Household | null>(null);
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeInviteCode, setActiveInviteCode] = useState<string | null>(null);
+  const [activeInviteExpiry, setActiveInviteExpiry] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -28,7 +30,6 @@ export function useHousehold(user: User) {
   const loadHousehold = async () => {
     setLoading(true);
 
-    // Check if user is a member of any household
     const { data: memberRow } = await supabase
       .from('household_members')
       .select('household_id')
@@ -44,23 +45,41 @@ export function useHousehold(user: User) {
 
       if (hh) {
         setHousehold(hh);
+
         const { data: membersList } = await supabase
           .from('household_members')
           .select('*')
           .eq('household_id', hh.id);
         if (membersList) setMembers(membersList);
+
+        // Load active invite code if exists
+        const { data: existingInvite } = await supabase
+          .from('household_invites')
+          .select('code, expires_at')
+          .eq('household_id', hh.id)
+          .eq('used', false)
+          .gt('expires_at', new Date().toISOString())
+          .single();
+
+        if (existingInvite) {
+          setActiveInviteCode(existingInvite.code);
+          setActiveInviteExpiry(existingInvite.expires_at);
+        } else {
+          setActiveInviteCode(null);
+          setActiveInviteExpiry(null);
+        }
       }
     } else {
-      // No household — that's fine, solo mode
       setHousehold(null);
       setMembers([]);
+      setActiveInviteCode(null);
+      setActiveInviteExpiry(null);
     }
 
     setLoading(false);
   };
 
   const createHousehold = useCallback(async (name: string) => {
-    // Create household
     const { data: newHH, error } = await supabase
       .from('households')
       .insert({ admin_id: user.id, name })
@@ -74,6 +93,20 @@ export function useHousehold(user: User) {
       .from('household_members')
       .insert({ household_id: newHH.id, user_id: user.id, email: user.email! });
 
+    // Migrate existing solo expenses to this household
+    await supabase
+      .from('expenses')
+      .update({ household_id: newHH.id })
+      .eq('user_id', user.id)
+      .is('household_id', null);
+
+    // Migrate existing solo categories to this household
+    await supabase
+      .from('categories')
+      .update({ household_id: newHH.id })
+      .eq('user_id', user.id)
+      .is('household_id', null);
+
     await loadHousehold();
     return { success: true };
   }, [user]);
@@ -82,13 +115,13 @@ export function useHousehold(user: User) {
     if (!household) return;
     if (household.admin_id !== user.id) return { error: 'Only admin can delete household' };
 
-    // Delete all members first
     await supabase.from('household_members').delete().eq('household_id', household.id);
-    // Delete household (expenses stay, household_id just becomes orphaned)
     await supabase.from('households').delete().eq('id', household.id);
 
     setHousehold(null);
     setMembers([]);
+    setActiveInviteCode(null);
+    setActiveInviteExpiry(null);
     return { success: true };
   }, [household, user]);
 
@@ -114,11 +147,14 @@ export function useHousehold(user: User) {
       .single();
 
     if (error) return { error: error.message };
+
+    setActiveInviteCode(data.code);
+    setActiveInviteExpiry(data.expires_at);
+
     return { code: data.code, expires_at: data.expires_at };
   }, [household, members, user]);
 
   const joinHousehold = useCallback(async (code: string) => {
-    // Check if user already in a household
     const { data: existing } = await supabase
       .from('household_members')
       .select('id')
@@ -127,7 +163,6 @@ export function useHousehold(user: User) {
 
     if (existing) return { error: 'You are already in a household. Leave it first.' };
 
-    // Validate code
     const { data: invite } = await supabase
       .from('household_invites')
       .select('*')
@@ -138,7 +173,6 @@ export function useHousehold(user: User) {
     if (!invite) return { error: 'Invalid or expired invite code.' };
     if (new Date(invite.expires_at) < new Date()) return { error: 'This invite code has expired.' };
 
-    // Check capacity
     const { data: currentMembers } = await supabase
       .from('household_members')
       .select('id')
@@ -146,12 +180,10 @@ export function useHousehold(user: User) {
 
     if (currentMembers && currentMembers.length >= 3) return { error: 'This household is already full.' };
 
-    // Join
     await supabase
       .from('household_members')
       .insert({ household_id: invite.household_id, user_id: user.id, email: user.email! });
 
-    // Mark invite used
     await supabase
       .from('household_invites')
       .update({ used: true })
@@ -183,7 +215,21 @@ export function useHousehold(user: User) {
 
     setHousehold(null);
     setMembers([]);
+    setActiveInviteCode(null);
+    setActiveInviteExpiry(null);
   }, [household, user]);
 
-  return { household, members, loading, createHousehold, deleteHousehold, generateInviteCode, joinHousehold, kickMember, leaveHousehold };
+  return {
+    household,
+    members,
+    loading,
+    activeInviteCode,
+    activeInviteExpiry,
+    createHousehold,
+    deleteHousehold,
+    generateInviteCode,
+    joinHousehold,
+    kickMember,
+    leaveHousehold
+  };
 }
