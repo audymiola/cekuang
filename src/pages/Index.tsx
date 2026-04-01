@@ -15,7 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = ({ user }: { user: User }) => {
-  const { household, loading: householdLoading } = useHousehold(user);
+  const { household, members, loading: householdLoading } = useHousehold(user);
   const { expenses, budget, categories, addExpense, updateExpense, deleteExpense, setBudget, addCategory, deleteCategory, updateCategoryBudget } = useExpenses(user, household?.id ?? null);
   const { signOut } = useAuth();
   const { toast } = useToast();
@@ -45,9 +45,10 @@ const Index = ({ user }: { user: User }) => {
     setEditingExpense(null);
   };
 
-  if (householdLoading) return (
+  // Show loading until household is ready
+  if (householdLoading || !household) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
-      <p className="text-muted-foreground text-sm">Loading...</p>
+      <p className="text-muted-foreground text-sm">Loading your household...</p>
     </div>
   );
 
